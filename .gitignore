@@ -1,0 +1,14 @@
+# Backend
+guildforge-backend/target/
+guildforge-backend/.idea/
+guildforge-backend/*.iml
+
+# Frontend
+guildforge-frontend/node_modules/
+guildforge-frontend/dist/
+guildforge-frontend/.env.local
+
+# OS / IDE
+.DS_Store
+*.swp
+.vscode/
