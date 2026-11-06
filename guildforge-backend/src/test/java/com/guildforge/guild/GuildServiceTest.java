@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.guildforge.log.LogRepository;
+import com.guildforge.membership.MembershipRankService;
 import com.guildforge.membership.MembershipRepository;
 import com.guildforge.user.UserRepository;
 import java.util.List;
@@ -28,6 +29,9 @@ class GuildServiceTest {
 
     @Mock
     private LogRepository logRepository;
+
+    @Mock
+    private MembershipRankService membershipRankService;
 
     @InjectMocks
     private GuildService guildService;

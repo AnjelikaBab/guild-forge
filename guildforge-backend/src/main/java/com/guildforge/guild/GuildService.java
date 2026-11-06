@@ -1,10 +1,13 @@
 package com.guildforge.guild;
 
+import com.guildforge.dsl.DslRulesEngine;
 import com.guildforge.log.LogRepository;
 import com.guildforge.membership.Membership;
+import com.guildforge.membership.MembershipRankService;
 import com.guildforge.membership.MembershipRepository;
 import com.guildforge.user.User;
 import com.guildforge.user.UserRepository;
+import com.guildforge.user.UserRole;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -24,16 +27,20 @@ public class GuildService {
     private final MembershipRepository membershipRepository;
     private final UserRepository userRepository;
     private final LogRepository logRepository;
+    private final MembershipRankService membershipRankService;
+    private final DslRulesEngine dslRulesEngine = new DslRulesEngine();
 
     public GuildService(
             GuildRepository guildRepository,
             MembershipRepository membershipRepository,
             UserRepository userRepository,
-            LogRepository logRepository) {
+            LogRepository logRepository,
+            MembershipRankService membershipRankService) {
         this.guildRepository = guildRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
         this.logRepository = logRepository;
+        this.membershipRankService = membershipRankService;
     }
 
     @Transactional(readOnly = true)
@@ -86,6 +93,38 @@ public class GuildService {
         g.setOwner(owner);
         g = guildRepository.save(g);
         return toDetail(g);
+    }
+
+    @Transactional
+    public Map<String, Object> updateDslRules(String username, Long guildId, String dslRules) {
+        User actor = userRepository
+                .findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        Guild guild = guildRepository
+                .findById(guildId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!canEditDsl(actor, guild)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the guild owner, a guild master, or an admin can edit rules");
+        }
+        String normalized = dslRules == null ? "" : dslRules.trim();
+        if (!normalized.isEmpty()) {
+            try {
+                dslRulesEngine.parseRules(normalized);
+            } catch (RuntimeException ex) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+            }
+        }
+        guild.setDslRules(normalized.isEmpty() ? null : normalized);
+        guild = guildRepository.save(guild);
+        membershipRankService.recalculateAllInGuild(guildId);
+        return toDetail(guild);
+    }
+
+    private boolean canEditDsl(User actor, Guild guild) {
+        if (actor.getRole() == UserRole.ADMIN || actor.getRole() == UserRole.GUILD_MASTER) {
+            return true;
+        }
+        return guild.getOwner() != null && guild.getOwner().getId().equals(actor.getId());
     }
 
     private Map<String, Object> toSummary(Guild g) {
